@@ -1,0 +1,41 @@
+name: Ενημέρωση δεδομένων ΥΠΑΑΤ
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+  push:
+    paths:
+      - "incoming/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Εγκατάσταση
+        run: pip install requests pandas xlrd openpyxl
+      - name: Λήψη και μετατροπή
+        run: python pipeline/update.py
+      - name: Αποθήκευση αν άλλαξε κάτι
+        run: |
+          git config user.name "psekasmoi-bot"
+          git config user.email "psekasmoi-bot@users.noreply.github.com"
+          git add -A ppp-db.json ppp-meta.json incoming
+          if git diff --cached --quiet; then
+            echo "Δεν υπάρχουν αλλαγές."
+          else
+            git commit -m "Δεδομένα ΥΠΑΑΤ $(python -c "import json;print(json.load(open('ppp-meta.json'))['updated'])")"
+            git push
+          fi
