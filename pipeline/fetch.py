@@ -19,8 +19,9 @@ def zk_click(s, html, comp_id, sid):
                headers=dict(UA, **{"ZK-SID": str(sid), "Referer": PAGE,
                                    "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"}))
     r.raise_for_status()
-    urls = re.findall(r'"(/oneClickUI/[^"]+|https?://[^"]+)"', r.text)
-    urls = [u.replace("\\/", "/") for u in urls if not u.endswith((".js", ".css", ".wpd", ".png", ".gif"))]
+    txt = r.text.replace("\\/", "/")   # η απάντηση έχει τα / ως \/
+    urls = re.findall(r'"(/oneClickUI/[^"]+|https?://[^"]+)"', txt)
+    urls = [u for u in urls if not u.endswith((".js", ".css", ".wpd", ".png", ".gif"))]
     if not urls:
         raise RuntimeError("Το κουμπί " + comp_id + " δεν έδωσε αρχείο: " + r.text[:300])
     return [u if u.startswith("http") else BASE + u for u in urls]
