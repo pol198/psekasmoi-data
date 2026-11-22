@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Ψεκασμοί – Στατιστικά</title>
+<style>
+:root{--bg:#f4f5f1;--card:#fff;--ink:#1d2a22;--ink2:#5b6a60;--line:#dfe3dc;--acc:#2f6b3f;--acc2:#1f4f8f;--bar:#2f6b3f;--bar2:#9bbfa4}
+@media (prefers-color-scheme:dark){:root{--bg:#111612;--card:#1b221d;--ink:#eef2ec;--ink2:#a9b5ac;--line:#2c352f;--acc:#7cc48f;--acc2:#8fb4ec;--bar:#7cc48f;--bar2:#3f6b4a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:980px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:26px;margin:0 0 4px} h2{font-size:18px;margin:0 0 12px}
+.sub{color:var(--ink2);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:0 0 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin:0 0 14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.kpi .v{font-size:28px;font-weight:700;letter-spacing:-.5px}
+.kpi .l{color:var(--ink2);font-size:14px}
+.kpi .d{color:var(--ink2);font-size:13px;margin-top:2px}
+button{font:inherit;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px 16px;cursor:pointer}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--ink2);font-weight:600}
+.scroll{overflow-x:auto}
+svg text{fill:var(--ink2);font-size:11px}
+.legend{display:flex;gap:14px;color:var(--ink2);font-size:13px;margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.msg{color:var(--ink2)}
+.err{color:#b3261e}
+.note{color:var(--ink2);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Στατιστικά · Ψεκασμοί</h1>
+  <p class="sub">Ανώνυμα, συνολικά νούμερα χρήσης. Μόνο από χρήστες που πάτησαν «Ναι».</p>
+
+  <div id="login" class="card">
+    <p style="margin:0 0 12px">Σύνδεση μόνο για τον διαχειριστή (ergoapps.dev@gmail.com).</p>
+    <div class="row"><button class="pri" id="btnLogin">Σύνδεση με Google</button><span id="loginMsg" class="msg"></span></div>
+  </div>
+
+  <div id="dash" hidden>
+    <div class="row" style="justify-content:space-between;margin:0 0 12px">
+      <span id="who" class="msg"></span>
+      <span class="row"><button id="btnCsvM">CSV ανά μήνα</button><button id="btnCsvD">CSV ανά ημέρα</button><button id="btnOut">Αποσύνδεση</button></span>
+    </div>
+    <div class="grid" id="kpis"></div>
+    <div class="card"><h2>Ενεργά κινητά ανά ημέρα (τελευταίες 90 ημέρες)</h2><div id="chart"></div>
+      <div class="legend"><span><i style="background:var(--bar)"></i>iPhone</span><span><i style="background:var(--bar2)"></i>Android</span></div></div>
+    <div class="card"><h2>Ανά μήνα</h2><div class="scroll"><table id="tblM"></table></div></div>
+    <p class="note">«Ενεργά κινητά» = κινητά που άνοιξαν την εφαρμογή (χωρίς να ξέρουμε ποια). Τα νούμερα έρχονται με καθυστέρηση μίας ημέρας. Δεν περιλαμβάνουν όσους πάτησαν «Όχι».</p>
+  </div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script>
+var CFG={apiKey:"AIzaSyDpIt9cX3vXs8Km4sKgb61RQaiwCBaSl0o",authDomain:"psekasmoi.firebaseapp.com",projectId:"psekasmoi",appId:"1:249758355227:web:643c10d5db15b51f298dbe"};
+var DEMO=/[?&]demo=1/.test(location.search);
+var $=function(id){return document.getElementById(id);};
+var fmt=function(n,d){return (n||0).toLocaleString("el-GR",{maximumFractionDigits:d||0,minimumFractionDigits:d||0});};
+var MONTHS=["Ιαν","Φεβ","Μαρ","Απρ","Μάι","Ιουν","Ιουλ","Αυγ","Σεπ","Οκτ","Νοε","Δεκ"];
+var data={D:{},M:{}};
+
+function parseDocs(docs){
+  docs.forEach(function(doc){
+    var id=doc.name.split("/").pop(), f={};
+    Object.keys(doc.fields||{}).forEach(function(k){ var v=doc.fields[k]; f[k]=+(v.integerValue||v.doubleValue||0); });
+    if(id.indexOf("D-")===0) data.D[id.slice(2)]=f; else if(id.indexOf("M-")===0) data.M[id.slice(2)]=f;
+  });
+}
+async function load(token){
+  var url="https://firestore.googleapis.com/v1/projects/psekasmoi/databases/(default)/documents/stats?pageSize=300", page="";
+  data={D:{},M:{}};
+  do{
+    var r=await fetch(url+(page?"&pageToken="+encodeURIComponent(page):""),{headers:{Authorization:"Bearer "+token}});
+    var j=await r.json();
+    if(!r.ok) throw new Error((j.error&&j.error.message)||("HTTP "+r.status));
+    parseDocs(j.documents||[]); page=j.nextPageToken||"";
+  }while(page);
+}
+function demoData(){
+  var now=new Date(), base=40;
+  for(var i=120;i>=1;i--){
+    var d=new Date(now.getTime()-i*864e5), ds=d.toISOString().slice(0,10), g=1+(120-i)/60, w=d.getDay()===0?0.6:1;
+    var dev=Math.round(base*g*w*(0.85+Math.random()*0.3)), ios=Math.round(dev*0.3);
+    data.D[ds]={dev:dev,dev_ios:ios,dev_and:dev-ios,opens:Math.round(dev*1.8),secs:Math.round(dev*260),new_dev:Math.round(dev*0.08),signed_dev:Math.round(dev*0.55),
+      e_spray:Math.round(dev*0.7),e_herb:Math.round(dev*0.15),e_fert:Math.round(dev*0.25),e_water:Math.round(dev*0.3),x_pdf:Math.round(dev*0.05),x_csv:Math.round(dev*0.02)};
+    var m=ds.slice(0,7); data.M[m]=data.M[m]||{mdev:0,mdev_ios:0,mdev_and:0};
+  }
+  Object.keys(data.M).forEach(function(m){ var days=Object.keys(data.D).filter(function(d){return d.slice(0,7)===m;}); var mx=Math.max.apply(null,days.map(function(d){return data.D[d].dev;}));
+    data.M[m].mdev=Math.round(mx*2.6); data.M[m].mdev_ios=Math.round(data.M[m].mdev*0.3); data.M[m].mdev_and=data.M[m].mdev-data.M[m].mdev_ios; });
+}
+function sum(keys, f){ return keys.reduce(function(a,k){ return a+(f(k)||0); },0); }
+function render(){
+  var days=Object.keys(data.D).sort(), today=new Date().toISOString().slice(0,10);
+  var last30=days.filter(function(d){ return d>=new Date(Date.now()-30*864e5).toISOString().slice(0,10) && d<today; });
+  var months=Object.keys(data.M).sort(), mNow=today.slice(0,7), mPrev=months.filter(function(m){return m<mNow;}).pop();
+  var D=function(d,k){ return (data.D[d]||{})[k]||0; };
+  var dev30=sum(last30,function(d){return D(d,"dev");}), secs30=sum(last30,function(d){return D(d,"secs");});
+  var ent30=sum(last30,function(d){return D(d,"e_spray")+D(d,"e_herb")+D(d,"e_fert")+D(d,"e_water");});
+  var mn=data.M[mNow]||{}, mp=data.M[mPrev]||{};
+  var k=[
+    [fmt(mn.mdev), "Ενεργά κινητά αυτόν τον μήνα", mPrev?("Προηγούμενος μήνας: "+fmt(mp.mdev)):""],
+    [fmt(last30.length?dev30/last30.length:0), "Ενεργά κινητά ανά ημέρα", "Μέσος όρος 30 ημερών"],
+    [fmt(dev30?secs30/dev30/60:0,1)+"′", "Χρόνος χρήσης ανά κινητό", "Λεπτά ανά ημέρα χρήσης"],
+    [fmt(sum(last30,function(d){return D(d,"opens");})), "Ανοίγματα εφαρμογής", "Τελευταίες 30 ημέρες"],
+    [fmt(ent30), "Εργασίες που καταγράφηκαν", "Τελευταίες 30 ημέρες"],
+    [fmt(sum(last30,function(d){return D(d,"new_dev");})), "Νέα κινητά", "Τελευταίες 30 ημέρες"],
+    [(mn.mdev?Math.round(100*(mn.mdev_ios||0)/mn.mdev):0)+"% / "+(mn.mdev?Math.round(100*(mn.mdev_and||0)/mn.mdev):0)+"%", "iPhone / Android", "Αυτόν τον μήνα"],
+    [(dev30?Math.round(100*sum(last30,function(d){return D(d,"signed_dev");})/dev30):0)+"%", "Με λογαριασμό", "Ποσοστό ημερών χρήσης"]
+  ];
+  $("kpis").innerHTML=k.map(function(x){ return '<div class="kpi"><div class="v">'+x[0]+'</div><div class="l">'+x[1]+'</div><div class="d">'+x[2]+'</div></div>'; }).join("");
+  chart(days.filter(function(d){ return d>=new Date(Date.now()-90*864e5).toISOString().slice(0,10) && d<today; }));
+  var rows=months.slice().reverse().map(function(m){
+    var dd=days.filter(function(d){return d.slice(0,7)===m;}), M=data.M[m]||{};
+    var dv=sum(dd,function(d){return D(d,"dev");}), sc=sum(dd,function(d){return D(d,"secs");});
+    var lab=MONTHS[+m.slice(5)-1]+" "+m.slice(0,4);
+    return [lab, M.mdev||0, M.mdev_ios||0, M.mdev_and||0, sum(dd,function(d){return D(d,"opens");}), dv?sc/dv/60:0,
+      sum(dd,function(d){return D(d,"e_spray");}), sum(dd,function(d){return D(d,"e_herb");}), sum(dd,function(d){return D(d,"e_fert");}), sum(dd,function(d){return D(d,"e_water");}),
+      sum(dd,function(d){return D(d,"x_pdf")+D(d,"x_csv");}), m];
+  });
+  window.__rowsM=rows;
+
+  $("tblM").innerHTML='<tr><th>Μήνας</th><th>Ενεργά κινητά</th><th>iPhone</th><th>Android</th><th>Ανοίγματα</th><th>Λεπτά/ημέρα</th><th>Ψεκασμοί</th><th>Ζιζανιοκτ.</th><th>Λιπάνσεις</th><th>Ποτίσματα</th><th>Εξαγωγές</th></tr>'+
+    rows.map(function(r){ return '<tr><td>'+r[0]+'</td>'+r.slice(1,11).map(function(v,i){ return '<td>'+fmt(v,i===4?1:0)+'</td>'; }).join("")+'</tr>'; }).join("");
+}
+function chart(days){
+  if(!days.length){ $("chart").innerHTML='<p class="msg">Δεν υπάρχουν ακόμα στοιχεία.</p>'; return; }
+  var W=900,H=220,P=28,bw=(W-P)/days.length, mx=Math.max.apply(null,days.map(function(d){return data.D[d].dev||0;}))||1;
+  var step=Math.pow(10,Math.floor(Math.log10(mx))); var top=Math.ceil(mx/step)*step;
+  var s='<svg viewBox="0 0 '+W+' '+(H+22)+'" width="100%" role="img" aria-label="Ενεργά κινητά ανά ημέρα">';
+  [0,0.5,1].forEach(function(t){ var y=H-t*(H-10); s+='<line x1="'+P+'" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="var(--line)"/><text x="0" y="'+(y+4)+'">'+fmt(top*t)+'</text>'; });
+  days.forEach(function(d,i){
+    var f=data.D[d], a=(f.dev_ios||0)/top*(H-10), b=(f.dev_and||0)/top*(H-10), x=P+i*bw;
+    s+='<rect x="'+(x+0.5)+'" y="'+(H-a-b)+'" width="'+Math.max(1,bw-1)+'" height="'+b+'" fill="var(--bar2)"><title>'+d+': '+(f.dev||0)+'</title></rect>';
+    s+='<rect x="'+(x+0.5)+'" y="'+(H-a)+'" width="'+Math.max(1,bw-1)+'" height="'+a+'" fill="var(--bar)"><title>'+d+': '+(f.dev||0)+'</title></rect>';
+    if(d.slice(8)==="01") s+='<text x="'+x+'" y="'+(H+16)+'">'+MONTHS[+d.slice(5,7)-1]+'</text>';
+  });
+  $("chart").innerHTML=s+'</svg>';
+}
+function csv(name, head, rows){
+  var t="﻿"+[head].concat(rows).map(function(r){ return r.join(";"); }).join("\n");
+  var a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([t],{type:"text/csv"})); a.download=name; a.click();
+}
+$("btnCsvM").onclick=function(){ csv("psekasmoi-stats-mines.csv",["Μήνας","Ενεργά κινητά","iPhone","Android","Ανοίγματα","Λεπτά ανά ημέρα","Ψεκασμοί","Ζιζανιοκτόνα","Λιπάνσεις","Ποτίσματα","Εξαγωγές"],
+  (window.__rowsM||[]).map(function(r){ return [r[11]].concat(r.slice(1,11).map(function(v,i){ return i===4?String(Math.round(v*10)/10).replace(".",","):v; })); })); };
+$("btnCsvD").onclick=function(){ var K=["dev","dev_ios","dev_and","opens","secs","new_dev","signed_dev","e_spray","e_herb","e_fert","e_water","x_pdf","x_csv"];
+  csv("psekasmoi-stats-imeres.csv",["Ημέρα"].concat(K), Object.keys(data.D).sort().map(function(d){ return [d].concat(K.map(function(k){ return data.D[d][k]||0; })); })); };
+
+function show(email){ $("login").hidden=true; $("dash").hidden=false; $("who").textContent=email; render(); }
+if(DEMO){ demoData(); show("Παράδειγμα με ψεύτικα νούμερα"); }
+else{
+  firebase.initializeApp(CFG);
+  var auth=firebase.auth();
+  $("btnLogin").onclick=function(){ $("loginMsg").textContent=""; auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(e){ $("loginMsg").innerHTML='<span class="err">'+e.message+'</span>'; }); };
+  $("btnOut").onclick=function(){ auth.signOut(); location.reload(); };
+  auth.onAuthStateChanged(async function(u){
+    if(!u) return;
+    $("loginMsg").textContent="Φόρτωση…";
+    try{ await load(await u.getIdToken()); show(u.email); }
+    catch(e){ $("loginMsg").innerHTML='<span class="err">Δεν επιτρέπεται ή απέτυχε: '+e.message+'</span>'; }
+  });
+}
+</script>
+</body>
+</html>
