@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Ψεκασμοί – Στατιστικά</title>
+<title>AgrosFolio – Στατιστικά</title>
 <style>
 :root{--bg:#f4f5f1;--card:#fff;--ink:#1d2a22;--ink2:#5b6a60;--line:#dfe3dc;--acc:#2f6b3f;--acc2:#1f4f8f;--bar:#2f6b3f;--bar2:#9bbfa4}
 @media (prefers-color-scheme:dark){:root{--bg:#111612;--card:#1b221d;--ink:#eef2ec;--ink2:#a9b5ac;--line:#2c352f;--acc:#7cc48f;--acc2:#8fb4ec;--bar:#7cc48f;--bar2:#3f6b4a}}
@@ -37,7 +37,7 @@ svg text{fill:var(--ink2);font-size:11px}
 </head>
 <body>
 <main>
-  <h1>Στατιστικά · Ψεκασμοί</h1>
+  <h1>Στατιστικά · AgrosFolio</h1>
   <p class="sub">Ανώνυμα, συνολικά νούμερα χρήσης. Μόνο από χρήστες που πάτησαν «Ναι».</p>
 
   <div id="login" class="card">
@@ -124,7 +124,7 @@ function render(){
     var lab=MONTHS[+m.slice(5)-1]+" "+m.slice(0,4);
     return [lab, M.mdev||0, M.mdev_ios||0, M.mdev_and||0, sum(dd,function(d){return D(d,"opens");}), dv?sc/dv/60:0,
       sum(dd,function(d){return D(d,"e_spray");}), sum(dd,function(d){return D(d,"e_herb");}), sum(dd,function(d){return D(d,"e_fert");}), sum(dd,function(d){return D(d,"e_water");}),
-      sum(dd,function(d){return D(d,"x_pdf")+D(d,"x_csv");}), m];
+      sum(dd,function(d){return D(d,"x_pdf")+D(d,"x_csv")+D(d,"x_bak");}), m];
   });
   window.__rowsM=rows;
 
@@ -151,7 +151,7 @@ function csv(name, head, rows){
 }
 $("btnCsvM").onclick=function(){ csv("psekasmoi-stats-mines.csv",["Μήνας","Ενεργά κινητά","iPhone","Android","Ανοίγματα","Λεπτά ανά ημέρα","Ψεκασμοί","Ζιζανιοκτόνα","Λιπάνσεις","Ποτίσματα","Εξαγωγές"],
   (window.__rowsM||[]).map(function(r){ return [r[11]].concat(r.slice(1,11).map(function(v,i){ return i===4?String(Math.round(v*10)/10).replace(".",","):v; })); })); };
-$("btnCsvD").onclick=function(){ var K=["dev","dev_ios","dev_and","opens","secs","new_dev","signed_dev","e_spray","e_herb","e_fert","e_water","x_pdf","x_csv"];
+$("btnCsvD").onclick=function(){ var K=["dev","dev_ios","dev_and","opens","secs","new_dev","signed_dev","e_spray","e_herb","e_fert","e_water","x_pdf","x_csv","x_bak"];
   csv("psekasmoi-stats-imeres.csv",["Ημέρα"].concat(K), Object.keys(data.D).sort().map(function(d){ return [d].concat(K.map(function(k){ return data.D[d][k]||0; })); })); };
 
 function show(email){ $("login").hidden=true; $("dash").hidden=false; $("who").textContent=email; render(); }
